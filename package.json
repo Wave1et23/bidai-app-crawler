@@ -1,0 +1,53 @@
+{
+  "name": "bidai-app-crawler",
+  "version": "1.0.0",
+  "private": false,
+  "type": "module",
+  "description": "笔袋(gaojiua.com)云盘批量下载器：按文件夹名字或网页地址批量下载文件到本地，支持断点续传、MD5 校验、按网页结构自动建子目录",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.17"
+  },
+  "keywords": [
+    "downloader",
+    "batch-download",
+    "cli",
+    "gaojiua",
+    "bidai",
+    "cloud-drive",
+    "resumable"
+  ],
+  "files": [
+    "src",
+    "scripts",
+    "docs",
+    "config.example.json",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "list": "node src/download.mjs --list",
+    "doctor": "node src/doctor.mjs",
+    "download": "node src/download.mjs",
+    "dry-run": "node src/download.mjs --dry-run",
+    "init": "node src/download.mjs --init",
+    "login": "node src/login.mjs",
+    "test": "node test/run-tests.mjs",
+    "check-secrets": "node scripts/check-secrets.mjs",
+    "prepublishOnly": "node scripts/check-secrets.mjs"
+  },
+  "dependencies": {
+    "cheerio": "^1.2.0"
+  },
+  "optionalDependencies": {
+    "playwright-core": "^1.49.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Wave1et23/bidai-app-crawler.git"
+  },
+  "bugs": {
+    "url": "https://github.com/Wave1et23/bidai-app-crawler/issues"
+  },
+  "homepage": "https://github.com/Wave1et23/bidai-app-crawler#readme"
+}

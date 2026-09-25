@@ -1,0 +1,67 @@
+{
+  // ─────────────────────────────────────────────────────────────
+  // 把这个文件复制成 config.json 再改（config.json 已在 .gitignore 中，不会被提交）。
+  // 其实也可以完全不建 config.json —— 所有项都有内置默认值，
+  // 直接用命令行参数就能跑：
+  //   node src/download.mjs --url "https://gaojiua.com/cloud/files/?folder_id=xxxx"
+  // ─────────────────────────────────────────────────────────────
+
+  // 文件保存到哪个目录。相对路径以「项目根目录」为基准。
+  "outputDir": "./downloads",
+
+  "collect": {
+    // gaojiua = 走笔袋(gaojiua.com)云盘接口（默认，已实测）
+    "mode": "gaojiua",
+
+    // 你在浏览器里打开的那个「文件夹页面」的地址，整条粘进来即可，
+    // 脚本会自动从中取出 folder_id。例如：
+    //   "listUrl": "https://gaojiua.com/cloud/files/?folder_id=1234567890"
+    "listUrl": "",
+
+    // 或者直接写文件夹名字（支持中文，会自动在云盘里搜索）：
+    //   "folder": "2024·高考英语真题"
+    // 也可以写「父目录/子目录」形式： "folder": "大学数学/线性代数"
+    // folder 与 listUrl 二选一；命令行的 --folder / --url 会覆盖这里。
+    "folder": "",
+
+    // 是否连同子文件夹一起下载（本来就不需要递归时保持 false）
+    "recursive": false
+  },
+
+  "layout": {
+    // true  = 在输出目录下按网页里的文件夹结构建子目录，文件放进去
+    // false = 文件平铺在输出目录
+    "createFolder": true,
+
+    // createFolder 为 true 时生效：
+    //   name = 只用当前文件夹名，例如  downloads/2024·高考英语真题/
+    //   path = 带上从根开始的完整层级，例如  downloads/大学数学/线性代数/
+    "mode": "name"
+  },
+
+  "naming": {
+    // original     = 用服务端返回的原始文件名（推荐）
+    // prefix-index = 加 0001_ 这样的序号前缀
+    "mode": "original",
+    "fallbackPrefix": "file"
+  },
+
+  "request": {
+    // 每个文件之间的间隔（毫秒）。这是防止被封 IP 的主要手段，不建议调太小。
+    "delayMs": 800,
+    "timeoutMs": 120000,
+    "retries": 3,
+    "retryBackoffMs": 3000
+  },
+
+  "behavior": {
+    // 已存在的文件跳过 → 支持断点续传，随时中断、重跑即可接着下
+    "skipExisting": true,
+    // 比对 Content-Length
+    "verifySize": true,
+    // 与服务端提供的 md5 比对（比只比大小可靠得多）
+    "verifyMd5": true,
+    // 覆盖已存在的文件（一般保持 false）
+    "overwrite": false
+  }
+}

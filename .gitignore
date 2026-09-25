@@ -1,0 +1,32 @@
+# ─────────────── 凭证 / 会话：绝对不能提交 ───────────────
+# 你的登录 token（等同于账号密码）
+.bidai-token
+.token
+# 浏览器登录会话（login.mjs 产出）
+auth-state.json
+auth-state-meta.json
+.browser-profile/
+.browser-profile-test/
+
+# ─────────────── 个人配置 ───────────────
+# config.json 里会写你自己的输出目录、文件夹 id/名字，属于个人配置。
+# 仓库里提供的是 config.example.json，请复制后使用。
+config.json
+
+# ─────────────── 下载产物与运行期文件 ───────────────
+downloads/
+report.json
+*.part
+.test-out/
+
+# ─────────────── 依赖与缓存 ───────────────
+node_modules/
+.npm-cache/
+.pnpm-store/
+
+# ─────────────── 编辑器 / 系统 ───────────────
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+*.log

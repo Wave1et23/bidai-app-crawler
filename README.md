@@ -1,6 +1,6 @@
 # bidai-app-crawler
 
-**笔袋（gaojiua.com）云盘批量下载爬虫/工具** —— 把网页里的文件夹整个下载到本地，自动按原目录结构建子目录。
+**笔袋（gaojiua.com）云盘批量下载爬虫工具** —— 把网页里的文件夹整个下载到本地，自动按原目录结构建子目录。
 
 手工点几十次「下载」很烦。这个工具让你一条命令下完一整个文件夹，而且：
 
@@ -29,7 +29,7 @@ npm install
 
 ### 2. 拿到你的登录凭证（token）
 
-在浏览器里打开 [gaojiua.com/cloud](https://gaojiua.com/cloud/)并登录你自己的账号，然后：
+在浏览器里打开 [https://gaojiua.com/cloud/](https://gaojiua.com/cloud/)并登录你自己的账号，然后：
 
 1. 按 **F12** 打开开发者工具
 2. 切到 **Application**（中文版叫「应用程序」）

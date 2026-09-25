@@ -11,7 +11,7 @@
 - ✅ **失败自动重试**，失败清单落到 `report.json`，重跑只补失败的
 - ✅ 附带 `--json` 输出和 `doctor` 自检，**方便交给 AI agent 使用**
 
-> 只用 Node.js 标准库 + 一个 HTML 解析库，不需要 Selenium，不需要开浏览器（登录除外）。
+> 只用 Node.js 标准库 + 一个 HTML 解析库，不需要 Selenium。
 
 ---
 

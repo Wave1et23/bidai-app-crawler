@@ -22,7 +22,22 @@ const TMP = path.join(ROOT, ".test-out-config.json");
 let passed = 0;
 let failed = 0;
 
-/** cond 可以是布尔值，也可以是一个惰性求值的函数（便于把断言写成代码块）。 */
+/** 记录一项断言结果。 */
+function record(name, passed_, detail = "") {
+  if (passed_) {
+    passed++;
+    console.log(`  ✓ ${name}`);
+  } else {
+    failed++;
+    console.error(`  ✗ ${name}${detail ? `\n      ${detail}` : ""}`);
+  }
+}
+
+/**
+ * 同步断言。cond 可以是布尔值，也可以是一个返回布尔值的函数（便于写成代码块）。
+ *
+ * ⚠️ 异步逻辑必须用 okAsync —— Promise 对象恒为真值，用 ok 会「永远通过」。
+ */
 function ok(name, cond, detail = "") {
   let result = cond;
   let err = null;
@@ -34,13 +49,23 @@ function ok(name, cond, detail = "") {
       err = e;
     }
   }
-  if (result) {
-    passed++;
-    console.log(`  ✓ ${name}`);
-  } else {
-    failed++;
-    console.error(`  ✗ ${name}${detail ? `\n      ${detail}` : ""}${err ? `\n      抛错: ${err.message}` : ""}`);
+  if (result && typeof result.then === "function") {
+    record(name, false, "异步断言请改用 await okAsync()");
+    return;
   }
+  record(name, result, detail + (err ? `\n      抛错: ${err.message}` : ""));
+}
+
+/** 异步断言：fn 返回 Promise<boolean>。 */
+async function okAsync(name, fn, detail = "") {
+  let result = false;
+  let err = null;
+  try {
+    result = await fn();
+  } catch (e) {
+    err = e;
+  }
+  record(name, result === true, detail + (err ? `\n      抛错: ${err.message}` : ""));
 }
 
 function section(title) {
@@ -119,6 +144,63 @@ ok(
   computeSign(1700000000, "0123456789abcdef", "/a") !== computeSign(1700000000, "0123456789abcdef", "/b")
 );
 ok("签名是 40 位十六进制（HMAC-SHA1）", /^[0-9a-f]{40}$/.test(computeSign(1700000000, "abc", "/x")));
+
+section("单元测试：列表接口分页（防静默截断）");
+
+// 站点默认每页只返回 20 条，不翻页会让 30 个文件的文件夹只下到 20 个，且不报错。
+// 这几个用例就是钉死这个行为。
+const { fetchAllPages, DEFAULT_PAGE_SIZE } = await import("../src/sites/gaojiua.mjs");
+
+/** 造一个假接口：共 total 条，每页返回 pageSize 条，page 从 1 开始 */
+function makeFakeApi(total, pageSize) {
+  const items = Array.from({ length: total }, (_, i) => ({ id: i + 1, name: `item-${i + 1}` }));
+  const calls = [];
+  return {
+    calls,
+    fetchPage: async (page) => {
+      calls.push(page);
+      const start = (page - 1) * pageSize;
+      return { code: "SUCCESS", data: items.slice(start, start + pageSize) };
+    },
+  };
+}
+
+ok("默认页大小必须大于服务端的 20，否则会被截断", DEFAULT_PAGE_SIZE > 20, `当前 ${DEFAULT_PAGE_SIZE}`);
+
+await okAsync("32 条 / 每页 10 条 → 翻 4 页取全 32 条", async () => {
+  const api = makeFakeApi(32, 10);
+  const { count, pages } = await fetchAllPages(api.fetchPage, { pageSize: 10 });
+  return count === 32 && pages === 4 && api.calls.join(",") === "1,2,3,4";
+});
+
+await okAsync("条数正好等于页大小时，要多请求一次空页才能确认到底", async () => {
+  const api = makeFakeApi(20, 20);
+  const { count, pages } = await fetchAllPages(api.fetchPage, { pageSize: 20 });
+  return count === 20 && pages === 2 && api.calls.join(",") === "1,2";
+});
+
+await okAsync("空文件夹只请求 1 页", async () => {
+  const api = makeFakeApi(0, 20);
+  const { count, pages } = await fetchAllPages(api.fetchPage, { pageSize: 20 });
+  return count === 0 && pages === 1;
+});
+
+await okAsync("翻页结果不重复且顺序稳定", async () => {
+  const api = makeFakeApi(45, 10);
+  const { result } = await fetchAllPages(api.fetchPage, { pageSize: 10 });
+  const ids = result.data.map((x) => x.id);
+  return ids.length === 45 && new Set(ids).size === 45 && ids[0] === 1 && ids[44] === 45;
+});
+
+await okAsync("达到翻页上限仍未取完时，必须抛错而不是假装成功", async () => {
+  const api = makeFakeApi(100, 10);
+  try {
+    await fetchAllPages(api.fetchPage, { pageSize: 10, maxPages: 3 });
+    return false; // 不该走到这里
+  } catch (err) {
+    return /上限/.test(err.message) && Array.isArray(err.partial) && err.partial.length === 30;
+  }
+});
 
 /* ══════════════════════════ 2. 端到端测试 ══════════════════════════ */
 

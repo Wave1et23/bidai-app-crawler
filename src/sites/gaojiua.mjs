@@ -20,6 +20,13 @@ export const API_BASE = "https://api.gaojiua.com/release";
 export const SITE_ORIGIN = "https://gaojiua.com";
 export const TOKEN_COOKIE = "bidai-token";
 
+/**
+ * 列文件接口默认每页只返回 20 条（不指定 page_size 就是 20），
+ * 不翻页会**静默丢数据**。所以这里显式指定一个较大的页大小，并逐页取完。
+ */
+export const DEFAULT_PAGE_SIZE = 200;
+export const MAX_PAGES = 500;
+
 // 从 bundle 里还原的 5 个签名密钥，按 ts % 5 选取
 const KEYS = [
   "SXx$dF+4mwJA@Mt8",
@@ -66,13 +73,50 @@ export function buildQuery(params) {
   return parts.length ? `?${parts.join("&")}` : "";
 }
 
+/**
+ * 按页把一个列表接口取完。
+ *
+ * 站点默认每页 20 条，少了这一步就会**静默截断**——一个 30 个文件的文件夹
+ * 只会拿到 20 个，而且不报任何错。所以必须显式指定 page_size 并翻页。
+ *
+ * 终止条件用「本页条数 < pageSize」：因为服务端不返回 total/分页元信息，
+ * 只能靠这一条判断到底了。整页返回时多请求一次空页，代价可忽略。
+ *
+ * 抽成独立函数是为了能单测（不需要真实接口）。
+ */
+export async function fetchAllPages(fetchPage, { pageSize = DEFAULT_PAGE_SIZE, maxPages = MAX_PAGES } = {}) {
+  const all = [];
+  let first = null;
+  let pages = 0;
+
+  for (let page = 1; page <= maxPages; page++) {
+    const json = await fetchPage(page);
+    if (first === null) first = json;
+    pages = page;
+
+    const arr = Array.isArray(json?.data) ? json.data : [];
+    all.push(...arr);
+
+    if (arr.length < pageSize) break;
+    if (page === maxPages) {
+      // 拿满了上限还没到底，说明可能还有数据——不能装作没事
+      const err = new Error(`翻页达到上限 ${maxPages} 页仍未取完（已取 ${all.length} 项），数据可能不完整`);
+      err.partial = all;
+      throw err;
+    }
+  }
+
+  return { result: { ...(first ?? { code: "SUCCESS" }), data: all }, pages, count: all.length };
+}
+
 export class GaojiuaClient {
-  constructor({ token, userAgent, timeoutMs = 120000, onLog = () => {} }) {
+  constructor({ token, userAgent, timeoutMs = 120000, onLog = () => {}, pageSize = DEFAULT_PAGE_SIZE }) {
     if (!token) throw new Error("缺少 bidai-token");
     this.token = token;
     this.userAgent = userAgent || "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Safari/537.36 Edg/153.0.0.0";
     this.timeoutMs = timeoutMs;
     this.onLog = onLog;
+    this.pageSize = pageSize;
   }
 
   /** 带签名与认证的 GET，返回解析后的 JSON。path 必须包含查询串。 */
@@ -127,11 +171,28 @@ export class GaojiuaClient {
     return raw ? { json, text, res } : json;
   }
 
-  /** 列出某个文件夹下的文件。注意：参数名是 parent_id，不是 folder_id（实测 folder_id 被服务端忽略）。 */
+  /**
+   * 列出某个文件夹下的文件（自动翻页取全）。
+   * 注意：参数名是 parent_id，不是 folder_id（实测 folder_id 被服务端忽略，会静默返回根目录）。
+   */
   async listFolder(folderId, extra = {}) {
-    const path = `/api/cloud/file/list/${buildQuery({ parent_id: folderId, ...extra })}`;
-    this.onLog(`  接口: GET ${path}`);
-    return this.apiGet(path);
+    const pageSize = Number(extra.page_size ?? extra.pageSize ?? this.pageSize) || DEFAULT_PAGE_SIZE;
+    const rest = { ...extra };
+    delete rest.page;
+    delete rest.page_size;
+    delete rest.pageSize;
+
+    const { result, pages, count } = await fetchAllPages(
+      async (page) => {
+        const path = `/api/cloud/file/list/${buildQuery({ parent_id: folderId, ...rest, page, page_size: pageSize })}`;
+        if (page === 1) this.onLog(`  接口: GET ${path}`);
+        return this.apiGet(path);
+      },
+      { pageSize }
+    );
+
+    if (pages > 1) this.onLog(`  自动翻页 ${pages} 页，共 ${count} 项`);
+    return result;
   }
 
   /**

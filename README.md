@@ -29,7 +29,7 @@ npm install
 
 ### 2. 拿到你的登录凭证（token）
 
-在浏览器里登录 [gaojiua.com](https://gaojiua.com)，然后：
+在浏览器里打开 [gaojiua.com/cloud]((https://gaojiua.com/cloud/)并登录你自己的账号，然后：
 
 1. 按 **F12** 打开开发者工具
 2. 切到 **Application**（中文版叫「应用程序」）
@@ -61,8 +61,6 @@ echo -n "把token粘到这里" > ~/.bidai-token
 node src/download.mjs --list                          # 列出云盘里的文件夹
 node src/download.mjs --folder "2024·高考英语真题"      # 下载这个文件夹
 ```
-
-默认保存到 `./downloads/2024·高考英语真题/`。
 
 ---
 

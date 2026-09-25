@@ -29,7 +29,7 @@ npm install
 
 ### 2. 拿到你的登录凭证（token）
 
-在浏览器里打开 [gaojiua.com/cloud]((https://gaojiua.com/cloud/)并登录你自己的账号，然后：
+在浏览器里打开 [gaojiua.com/cloud](https://gaojiua.com/cloud/)并登录你自己的账号，然后：
 
 1. 按 **F12** 打开开发者工具
 2. 切到 **Application**（中文版叫「应用程序」）

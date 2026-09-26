@@ -40,6 +40,14 @@ export const DEFAULT_CONFIG = {
     skipExisting: true,
     verifySize: true,
     verifyMd5: true,
+    /**
+     * MD5 与服务器记录不符时怎么办：
+     *   "fail"（默认）= 删除临时文件并重试，最终计入失败
+     *   "warn"        = 保留文件，但明确告警并记入 report 的 warnings
+     * 留这个开关的原因：站点元数据可能是过期的（实测存在 size/md5 与实际内容不符、
+     * 但 Content-Length 与实际字节数一致且文件本身合法完整的文件）。
+     */
+    md5Mismatch: "fail",
     overwrite: false,
   },
   profileDir: ".browser-profile",

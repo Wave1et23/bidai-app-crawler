@@ -53,6 +53,8 @@ if (folderArg) cfg.collect.folder = folderArg;
 if (flag("--flat") || flag("--no-folder")) cfg.layout.createFolder = false;
 if (flag("--with-path") || flag("--full-path")) cfg.layout.mode = "path";
 if (flag("--recursive") || flag("-r")) cfg.collect.recursive = true;
+// MD5 与服务器记录不符时：--md5-warn 保留文件（仅告警），默认视为失败
+if (flag("--md5-warn")) cfg.behavior.md5Mismatch = "warn";
 
 const dryRun = flag("--dry-run");
 const limit = Number(opt("--limit", "0")) || 0;
@@ -100,6 +102,7 @@ function printHelp() {
   --flat                  不要子目录，文件平铺在输出目录
   --with-path             子目录带完整层级（父目录/子目录/）而非只有当前文件夹名
   --recursive, -r         连同子文件夹一起下载
+  --md5-warn              MD5 与服务器记录不符时保留文件（默认视为失败）
   --dry-run               只列清单，不下载
   --limit <N>             只处理前 N 个文件
   --json                  以 JSON 输出结果（便于脚本/agent 解析）
@@ -324,7 +327,8 @@ function resolveTargetName(item, res) {
 
 let ok = 0,
   skipped = 0,
-  failed = [];
+  failed = [],
+  warned = [];
 let aborted = false;
 
 const queue = limit ? items.slice(0, limit) : items;
@@ -393,12 +397,25 @@ for (const [i, item] of queue.entries()) {
         throw new Error(`大小不符：期望 ${expected} 字节，实际 ${got} 字节`);
       }
 
-      // 服务端在列表/接口里给了 md5，用它做端到端校验（比大小更可靠）
+      // 服务端在列表/接口里给了 md5，用它做端到端校验（比只比大小可靠）
       if (cfg.behavior.verifyMd5 && item.md5) {
         const gotMd5 = await md5File(finalPart);
         if (gotMd5.toLowerCase() !== String(item.md5).toLowerCase()) {
-          fs.rmSync(finalPart, { force: true });
-          throw new Error(`MD5 不符：期望 ${item.md5}，实际 ${gotMd5}`);
+          if (cfg.behavior.md5Mismatch === "warn") {
+            // 保留文件，但必须留下痕迹：很可能是服务端元数据过期
+            warned.push({
+              path: itemLabel(item, finalName),
+              expectedMd5: item.md5,
+              actualMd5: gotMd5,
+              expectedSize: item.size ?? null,
+              actualSize: got,
+              note: "MD5 与服务器记录不符，已按配置保留文件（服务器元数据可能过期）",
+            });
+            log(`${prefix} ⚠ MD5 与服务器记录不符，已保留文件: ${itemLabel(item, finalName)}`);
+          } else {
+            fs.rmSync(finalPart, { force: true });
+            throw new Error(`MD5 不符：期望 ${item.md5}，实际 ${gotMd5}`);
+          }
         }
       }
 
@@ -430,8 +447,10 @@ const report = {
   downloaded: ok,
   skipped,
   failedCount: failed.length,
+  warnedCount: warned.length,
   aborted,
   failed,
+  warned,
 };
 const reportFile = path.join(cfg.root, "report.json");
 fs.writeFileSync(reportFile, JSON.stringify(report, null, 2), "utf8");
@@ -441,12 +460,17 @@ if (asJson) {
 } else {
   console.log("");
   console.log("────────────── 下载结果 ──────────────");
-  console.log(`成功: ${ok}   跳过(已存在): ${skipped}   失败: ${failed.length}   总计: ${queue.length}`);
+  console.log(`成功: ${ok}   跳过(已存在): ${skipped}   失败: ${failed.length}   警告: ${warned.length}   总计: ${queue.length}`);
   console.log(`输出目录: ${cfg.outputDir}`);
+  if (warned.length) {
+    console.log(`\n⚠ 有 ${warned.length} 个文件的 MD5 与服务器记录不符，但已保留（服务器元数据可能过期）：`);
+    warned.slice(0, 10).forEach((w) => console.log(`  ⚠ ${w.path}`));
+  }
   if (failed.length) {
     console.log(`\n失败清单已写入 report.json（前 10 条）：`);
     failed.slice(0, 10).forEach((f) => console.log(`  ✗ ${f.path || f.name} — ${f.error}`));
     console.log("\n重新运行本脚本即可只重试失败的文件（成功的会自动跳过）。");
+    console.log("若失败原因都是「MD5 不符」而文件其实是好的，可加 --md5-warn 保留文件。");
   }
   if (aborted) console.log("\n⚠ 因凭证失效提前中止，请重新获取 token 后再跑一次。");
 }
